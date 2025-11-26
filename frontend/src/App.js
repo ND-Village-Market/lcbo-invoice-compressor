@@ -3,6 +3,9 @@ import './App.css';
 import FileUpload from './components/FileUpload';
 import ProcessingResults from './components/ProcessingResults';
 
+// API URL - uses environment variable in production, localhost in development
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 function App() {
   const [sessionId, setSessionId] = useState(null);
   const [results, setResults] = useState([]);
@@ -19,7 +22,7 @@ function App() {
         formData.append('files', file);
       });
 
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -43,7 +46,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/download/${sessionId}/${filename}`
+        `${API_URL}/download/${sessionId}/${filename}`
       );
 
       if (!response.ok) {

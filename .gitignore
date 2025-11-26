@@ -5,3 +5,6 @@ venv/
 .env
 */.env
 */node_modules
+node_modules/
+*.pyc
+.DS_Store
