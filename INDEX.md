@@ -1,20 +1,72 @@
-# LCBO Invoice PDF Processor - Complete Index
+# LCBO Invoice Processor - Complete Index
 
-## 📚 Documentation Files
+## 🌐 WEB APPLICATION (NEW)
 
-### Getting Started
-1. **QUICKSTART.md** - Fast setup and usage (START HERE)
-2. **README.md** - Full feature documentation and troubleshooting
-3. **PROJECT_SUMMARY.md** - Project overview and results
+### Getting Started with Web App
+1. **[QUICKSTART_WEB.md](QUICKSTART_WEB.md)** - Quick commands & setup ⭐ START HERE
+2. **[WEB_README.md](WEB_README.md)** - Complete web app documentation
+3. **[MIGRATION.md](MIGRATION.md)** - What changed from CLI to web
+
+### Technical Documentation
+4. **[ARCHITECTURE_WEB.md](ARCHITECTURE_WEB.md)** - System design & diagrams
+5. **[TESTING.md](TESTING.md)** - How to test the application
+6. **[DELIVERY.md](DELIVERY.md)** - Project completion summary
+
+## 🔨 WEB APPLICATION STRUCTURE
+
+### Backend (FastAPI)
+```
+backend/
+├── main.py              - REST API endpoints
+├── pdf_processor.py     - PDF processing logic
+├── requirements.txt     - Python dependencies
+├── __init__.py
+└── venv/               - Virtual environment (auto-created)
+```
+
+### Frontend (React)
+```
+frontend/
+├── src/
+│   ├── App.js          - Main component
+│   ├── index.js        - React entry point
+│   ├── components/     - UI components
+│   │   ├── FileUpload.js
+│   │   └── ProcessingResults.js
+│   └── *.css          - Styling
+├── public/index.html   - HTML root
+├── package.json        - Dependencies
+└── node_modules/       - Packages (auto-installed)
+```
+
+## 🚀 QUICK START - WEB APP
+
+### One-Command Setup & Run
+```bash
+chmod +x setup_web.sh start.sh && ./setup_web.sh && ./start.sh
+```
+
+### Access
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+---
+
+## 📚 ORIGINAL CLI DOCUMENTATION (Still Available)
+
+### Getting Started with CLI
+1. **[QUICKSTART.md](QUICKSTART.md)** - Quick setup for CLI version
+2. **[README.md](README.md)** - Full CLI documentation
+3. **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project overview
 
 ### Technical Details
-4. **ARCHITECTURE.md** - System design and data flow
-5. **INDEX.md** - This file
+4. **[ARCHITECTURE.md](ARCHITECTURE.md)** - Original system design
 
-## 🐍 Python Scripts
+## 🐍 ORIGINAL CLI SCRIPTS
 
-### Main Processing
-- **pdf_processor.py** - Core PDF processor class
+### Main Processing (CLI)
+- **pdf_processor.py** (root) - Core PDF processor (CLI version)
   - Extract invoice metadata
   - Parse product tables
   - Generate condensed PDFs
@@ -26,28 +78,223 @@
   - Summary reporting
 
 ### Setup & Configuration
-- **setup.sh** - Automated setup script
+- **setup.sh** - Automated setup script (CLI)
 - **config_template.py** - Customization template
 
-## 📄 Example Output
+## 📊 COMPARISON: WEB vs CLI
 
-- **Nov 19, 2025 invoice.pdf** - Original LCBO invoice (92 KB)
-- **Nov 19, 2025 invoice_condensed.pdf** - Processed output (5.2-8 KB)
+| Feature | Web App | CLI |
+|---------|---------|-----|
+| User Interface | ✅ React UI | Command line |
+| Batch Upload | ✅ Multiple files at once | One by one |
+| Real-time Feedback | ✅ Progress display | Console output |
+| Error Handling | ✅ Visual error messages | Terminal errors |
+| File Download | ✅ One-click download | Manual file access |
+| Setup Time | ✅ < 5 minutes | ~ 5 minutes |
+| Browser Access | ✅ http://localhost:3000 | N/A |
+| Original Features | ✅ All preserved | ✅ Still works |
 
-## 🚀 Quick Commands
+## 🎯 WHICH VERSION TO USE?
 
-```bash
-# One-time setup
-bash setup.sh
+### Use Web App If You:
+- Want a user-friendly interface
+- Need to process multiple files regularly
+- Prefer modern web interface
+- Want real-time feedback
+- Share with non-technical users
 
-# Single PDF
-source venv/bin/activate
-python3 pdf_processor.py
+### Use CLI If You:
+- Prefer command-line automation
+- Want to script batch processing
+- Integrate with other tools
+- Have simple one-off needs
+- Use CI/CD pipelines
 
-# Multiple PDFs
-source venv/bin/activate
-python3 batch_process.py [directory]
+## 📁 PROJECT DIRECTORY STRUCTURE
+
 ```
+lcbo_compress/
+│
+├── 🌐 WEB APPLICATION
+│   ├── frontend/                    - React application
+│   ├── backend/                     - FastAPI server
+│   ├── setup_web.sh               - Web setup script
+│   ├── start.sh                   - Web startup script
+│   ├── WEB_README.md              - Web documentation
+│   ├── QUICKSTART_WEB.md          - Web quick start
+│   ├── MIGRATION.md               - What changed
+│   ├── ARCHITECTURE_WEB.md        - System design
+│   ├── TESTING.md                 - Test guide
+│   └── DELIVERY.md                - Project summary
+│
+├── 🐍 ORIGINAL CLI
+│   ├── pdf_processor.py           - Original processor
+│   ├── batch_process.py           - Batch tool
+│   ├── setup.sh                   - CLI setup
+│   ├── config_template.py         - Config template
+│   ├── README.md                  - CLI documentation
+│   ├── QUICKSTART.md              - CLI quick start
+│   ├── PROJECT_SUMMARY.md         - Project info
+│   └── ARCHITECTURE.md            - Original design
+│
+├── 📊 DATA
+│   └── invoices/                  - Sample PDFs
+│
+└── 📋 THIS FILE
+    └── INDEX.md                   - Navigation guide
+```
+
+## 🔧 TECHNOLOGY STACK
+
+### Web Application
+- **Frontend**: React 18, CSS3, Fetch API
+- **Backend**: FastAPI, Uvicorn, Python 3.7+
+- **PDF**: pdfplumber, reportlab, PyPDF2
+- **Runtime**: Node.js 14+, Python 3.7+
+
+### Original CLI
+- **Language**: Python 3.7+
+- **PDF Libraries**: pdfplumber, reportlab, PyPDF2
+
+## 📖 DOCUMENTATION OVERVIEW
+
+### For Quick Starts
+- Start with **QUICKSTART_WEB.md** (web) or **QUICKSTART.md** (CLI)
+
+### For Complete Information
+- **WEB_README.md** - Complete web app guide (130+ lines)
+- **README.md** - Complete CLI guide (100+ lines)
+
+### For Understanding Architecture
+- **ARCHITECTURE_WEB.md** - Web system design (300+ lines)
+- **ARCHITECTURE.md** - CLI system design (50+ lines)
+
+### For Testing
+- **TESTING.md** - Web app testing (200+ lines)
+
+### For Migration
+- **MIGRATION.md** - CLI to web migration (170+ lines)
+
+### For Project Info
+- **DELIVERY.md** - Project completion summary
+- **PROJECT_SUMMARY.md** - Original project overview
+
+## 🚀 GETTING STARTED
+
+### Option 1: Web Application (Recommended) ⭐
+```bash
+chmod +x setup_web.sh start.sh
+./setup_web.sh      # One-time setup
+./start.sh          # Run application
+# Open http://localhost:3000
+```
+
+### Option 2: Original CLI
+```bash
+bash setup.sh       # One-time setup
+source venv/bin/activate
+python3 batch_process.py ./invoices
+```
+
+## 📊 FILE STATISTICS
+
+| Component | Lines | Files |
+|-----------|-------|-------|
+| Web Backend | 450+ | 3 |
+| Web Frontend | 600+ | 8 |
+| Web Documentation | 1,200+ | 6 |
+| CLI Code | 400+ | 2 |
+| CLI Documentation | 300+ | 4 |
+| **Total** | **~3,000+** | **~20+** |
+
+## ✨ KEY FEATURES
+
+### Web App
+- ✅ Drag & drop upload
+- ✅ Batch processing
+- ✅ Real-time feedback
+- ✅ Individual downloads
+- ✅ Session management
+- ✅ Error handling
+- ✅ Mobile responsive
+
+### CLI
+- ✅ Batch processing
+- ✅ Directory scanning
+- ✅ Summary reporting
+- ✅ Scriptable
+
+### Both
+- ✅ 94% file size reduction
+- ✅ Professional formatting
+- ✅ Alphabetical sorting
+- ✅ Page numbering
+- ✅ Error recovery
+
+## 🔗 QUICK LINKS
+
+### Web Application
+- Documentation: [WEB_README.md](WEB_README.md)
+- Quick Start: [QUICKSTART_WEB.md](QUICKSTART_WEB.md)
+- Architecture: [ARCHITECTURE_WEB.md](ARCHITECTURE_WEB.md)
+
+### Original CLI
+- Documentation: [README.md](README.md)
+- Quick Start: [QUICKSTART.md](QUICKSTART.md)
+- Architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
+
+### Project Info
+- Migration Guide: [MIGRATION.md](MIGRATION.md)
+- Testing Guide: [TESTING.md](TESTING.md)
+- Delivery Summary: [DELIVERY.md](DELIVERY.md)
+
+## 🎓 LEARNING PATH
+
+1. **5 minutes**: Read QUICKSTART_WEB.md or QUICKSTART.md
+2. **10 minutes**: Run setup script
+3. **5 minutes**: Launch application
+4. **10 minutes**: Test with sample PDFs
+5. **15 minutes**: Read full documentation
+6. **Optional**: Review ARCHITECTURE documents
+
+## 🆘 TROUBLESHOOTING
+
+### Web App Issues
+→ See [QUICKSTART_WEB.md](QUICKSTART_WEB.md#troubleshooting)
+
+### CLI Issues
+→ See [QUICKSTART.md](QUICKSTART.md#troubleshooting)
+
+### General Help
+→ See [WEB_README.md](WEB_README.md#troubleshooting) or [README.md](README.md)
+
+## 📞 SUPPORT RESOURCES
+
+| Question | Resource |
+|----------|----------|
+| How to start? | QUICKSTART_WEB.md |
+| How does it work? | ARCHITECTURE_WEB.md |
+| Having issues? | TESTING.md or QUICKSTART_WEB.md |
+| What changed? | MIGRATION.md |
+| Project details? | DELIVERY.md |
+
+## ✅ VERIFICATION
+
+- [ ] Can read this INDEX.md
+- [ ] Found your preferred version (web or CLI)
+- [ ] Located relevant documentation
+- [ ] Ready to get started
+
+## 🎉 YOU'RE READY!
+
+**Choose your path:**
+- **Web App**: Start with [QUICKSTART_WEB.md](QUICKSTART_WEB.md)
+- **CLI**: Start with [QUICKSTART.md](QUICKSTART.md)
+
+---
+
+**Last Updated**: 2024
+**Current Version**: 2.0 (Web + CLI)
 
 ## 📊 Key Improvements
 
