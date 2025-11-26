@@ -4,8 +4,12 @@ Batch PDF Invoice Processor - Process multiple PDF invoices at once
 """
 
 import os
+import sys
 import glob
 from pathlib import Path
+
+# Add backend to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 from pdf_processor import LCBOInvoiceProcessor
 
 

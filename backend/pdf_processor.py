@@ -238,14 +238,10 @@ class LCBOInvoiceProcessor:
         return self.invoice_info, self.products
     
     def generate_condensed_pdf(self, output_path):
-        """Generate a condensed, readable PDF with print-safe margins"""
-        # 0.5 inch margins on all sides for safe printing
-        margin_size = 0.5 * inch
+        """Generate a condensed, readable PDF"""
         doc = SimpleDocTemplate(output_path, pagesize=letter,
-                              rightMargin=margin_size,
-                              leftMargin=margin_size,
-                              topMargin=margin_size,
-                              bottomMargin=margin_size)
+                              rightMargin=0.5*inch, leftMargin=0.5*inch,
+                              topMargin=0.5*inch, bottomMargin=0.5*inch)
         
         styles = getSampleStyleSheet()
         story = []
@@ -385,3 +381,42 @@ class LCBOInvoiceProcessor:
                 writer.write(f)
         except Exception as e:
             pass  # If page number addition fails, continue with PDF without page numbers
+
+
+def main():
+    """Main processing function"""
+    import sys
+    
+    # Get PDF file
+    pdf_file = "Nov 19, 2025 invoice.pdf"
+    
+    if not os.path.exists(pdf_file):
+        print(f"Error: {pdf_file} not found")
+        sys.exit(1)
+    
+    print(f"Processing: {pdf_file}")
+    print("=" * 60)
+    
+    # Process PDF
+    processor = LCBOInvoiceProcessor(pdf_file)
+    invoice_info, products = processor.process()
+    
+    print(f"Order #: {invoice_info.get('order_number')}")
+    print(f"Date: {invoice_info.get('order_date')}")
+    print(f"Customer: {invoice_info.get('customer_name')}")
+    print(f"Items: {len(products)}")
+    
+    totals = processor.calculate_totals()
+    print(f"Total items: {totals['item_count']}")
+    
+    # Generate condensed PDF
+    output_file = pdf_file.replace('.pdf', '_condensed.pdf')
+    print(f"\nGenerating condensed PDF: {output_file}")
+    processor.generate_condensed_pdf(output_file)
+    
+    print(f"✓ PDF created successfully!")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
