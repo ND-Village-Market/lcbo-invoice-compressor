@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import FileUpload from './components/FileUpload';
 import ProcessingResults from './components/ProcessingResults';
@@ -10,7 +10,19 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [results, setResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showWarmupHint, setShowWarmupHint] = useState(false);
   const [error, setError] = useState(null);
+
+  // Show a Render warmup hint if processing takes longer than a few seconds
+  useEffect(() => {
+    if (!isProcessing) {
+      setShowWarmupHint(false);
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setShowWarmupHint(true), 7000);
+    return () => clearTimeout(timer);
+  }, [isProcessing]);
 
   const handleUpload = async (files) => {
     setIsProcessing(true);
@@ -82,6 +94,18 @@ function App() {
 
       <main className="app-main">
         {error && <div className="error-message">{error}</div>}
+
+        {isProcessing && (
+          <div className="loading-card">
+            <div className="spinner" aria-hidden="true" />
+            <div className="loading-text">Processing your documents...</div>
+            {showWarmupHint && (
+              <div className="loading-subtext">
+                If this takes a bit, the Render server may be spinning up. Please stay on this page.
+              </div>
+            )}
+          </div>
+        )}
 
         {!sessionId ? (
           <FileUpload 
