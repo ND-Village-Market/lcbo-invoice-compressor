@@ -282,32 +282,33 @@ class LCBOInvoiceProcessor:
         sorted_products = sorted(self.products, key=lambda p: p['description'].lower())
         
         # Products table - condensed columns
-        products_data = [['Product #', 'Size (mL)', 'Description', 'DEP', 'Ordered', 'Shipped', 'Recieved']]
+        products_data = [['Received', 'Product #', 'Size (mL)', 'Description', 'DEP', 'Ordered', 'Shipped']]
         
         for product in sorted_products:
             products_data.append([
+                '',  # Received checkbox/input left empty
                 product['product_number'],
                 product['size_ml'],
                 product['description'],  # Full description, no truncation
                 product['dep'],
                 str(product['ordered']),
-                str(product['shipped']),
-                ''  # Empty Recieved column
+                str(product['shipped'])
             ])
         
         # Create products table with appropriate column widths
-        col_widths = [0.75*inch, 0.9*inch, 4.2*inch, 0.5*inch, 0.65*inch, 0.65*inch, 0.65*inch]
+        col_widths = [0.6*inch, 0.8*inch, 0.8*inch, 3.4*inch, 0.5*inch, 0.7*inch, 0.7*inch]
         products_table = Table(products_data, colWidths=col_widths)
         
         # Build table style with alternating row colors
         table_styles = [
-            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 8),
-            ('FONT', (0, 1), (-1, -1), 'Helvetica', 7.5),
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9.5),
+            ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),  # Align Product # column to right
-            ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Center-align Size column
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Received column
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),   # Product # column
+            ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Size column
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('LEFTPADDING', (0, 0), (-1, -1), 3),
