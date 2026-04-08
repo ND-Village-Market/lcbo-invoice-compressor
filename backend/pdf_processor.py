@@ -24,18 +24,175 @@ class LCBOInvoiceProcessor:
         self.invoice_info = {}
         # Columns to display in output
         self.columns = ['product_number', 'size_ml', 'description', 'dep', 'ordered', 'shipped']
+
+    def _extract_size_ml(self, text):
+        """Extract numeric size in mL from a text fragment."""
+        match = re.search(r'(\d+(?:\.\d+)?)\s*ml\b', text, re.IGNORECASE)
+        if not match:
+            return ''
+        value = float(match.group(1))
+        return str(int(value)) if value.is_integer() else match.group(1)
+
+    def _extract_case_units(self, lines, start_idx):
+        """Extract case unit count from nearby lines in new invoice format."""
+        for fwd_idx in range(start_idx + 1, min(start_idx + 10, len(lines))):
+            case_match = re.search(r'\{\s*(\d+)\s+units\s*\}', lines[fwd_idx], re.IGNORECASE)
+            if case_match:
+                return case_match.group(1)
+        return ''
+
+    def _clean_product_name_line(self, line):
+        """Strip pricing and noise from a product name line."""
+        cleaned = re.sub(r'\s+Wholesale\s+price:.*$', '', line, flags=re.IGNORECASE).strip()
+        return cleaned
+
+    def _is_noise_line(self, line):
+        """Identify non-description lines in the new invoice format."""
+        if not line:
+            return True
+        lowered = line.lower().strip()
+
+        # Skip pure money lines and document/navigation noise.
+        if re.fullmatch(r'\$[\d,]+(?:\.\d{2})?', lowered):
+            return True
+
+        # Skip standalone date lines like "April 15, 2026".
+        if re.fullmatch(r'(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},\s+\d{4}', lowered):
+            return True
+
+        noise_tokens = [
+            'purchasable only by case',
+            'qty. ordered:',
+            'estimated delivery date',
+            'in progress',
+            'unfulfilled',
+            'complete',
+            'fulfilled by:',
+            'fulfillment method:',
+            'order total:',
+            'order information',
+            'delivery option',
+            'delivery address',
+            'billing address',
+            'payment method',
+            'lcbo information',
+            'how the wholesale price is calculated',
+            'status:',
+            'date:',
+            'order #',
+            'print order',
+            'items ordered',
+        ]
+
+        return any(token in lowered for token in noise_tokens)
+
+    def _extract_products_new_format(self, pdf):
+        """Extract products from the new LCBO web-style invoice format."""
+        products = []
+
+        for page in pdf.pages:
+            text = page.extract_text() or ''
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+            for i, line in enumerate(lines):
+                lcbo_match = re.search(r'LCBO#:\s*(\d+)\b(.*)$', line, re.IGNORECASE)
+                if not lcbo_match:
+                    continue
+
+                product_number = lcbo_match.group(1)
+                trailing = lcbo_match.group(2) or ''
+                size_ml = self._extract_size_ml(trailing)
+                case_units = self._extract_case_units(lines, i)
+                if case_units and size_ml:
+                    size_ml = f"{case_units} x {size_ml}"
+
+                # Product name is usually on the line before LCBO#, with possible wrapped lines.
+                description_parts = []
+
+                for back_idx in range(max(0, i - 3), i):
+                    candidate = lines[back_idx]
+                    if self._is_noise_line(candidate):
+                        continue
+
+                    # Skip other LCBO lines in case of extraction artifacts.
+                    if 'lcbo#:' in candidate.lower():
+                        continue
+
+                    cleaned = self._clean_product_name_line(candidate)
+                    if cleaned:
+                        description_parts.append(cleaned)
+
+                # Ensure we include the base name from a line containing Wholesale price.
+                if i - 1 >= 0 and not description_parts:
+                    base_line = self._clean_product_name_line(lines[i - 1])
+                    if base_line and not self._is_noise_line(base_line):
+                        description_parts.append(base_line)
+
+                # De-duplicate while preserving order.
+                seen = set()
+                deduped_desc = []
+                for part in description_parts:
+                    if part not in seen:
+                        deduped_desc.append(part)
+                        seen.add(part)
+
+                description = ' '.join(deduped_desc).strip() or 'Unknown'
+
+                ordered = 0
+                shipped = 0
+
+                # Qty is typically after LCBO#, but search within a short forward window.
+                for fwd_idx in range(i + 1, min(i + 9, len(lines))):
+                    qty_line = lines[fwd_idx]
+                    qty_match = re.search(r'Qty\.\s*Ordered:\s*(\d+)(?:\s*\|\s*Fulfilled:\s*(\d+))?', qty_line, re.IGNORECASE)
+                    if qty_match:
+                        ordered = int(qty_match.group(1))
+                        if qty_match.group(2) is not None:
+                            shipped = int(qty_match.group(2))
+                        else:
+                            # Fulfilled quantity is absent in most new-format rows.
+                            # Keep parity with prior output behavior by defaulting shipped to ordered.
+                            shipped = ordered
+                        break
+
+                product = {
+                    'product_number': product_number,
+                    'size_ml': size_ml,
+                    'description': description,
+                    'dep': '',
+                    'ordered': ordered,
+                    'shipped': shipped,
+                }
+                products.append(product)
+
+        # Remove accidental duplicates by product number + description + ordered.
+        unique_products = []
+        seen_keys = set()
+        for product in products:
+            key = (product['product_number'], product['description'], product['ordered'])
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            unique_products.append(product)
+
+        return unique_products
         
     def extract_invoice_info(self, pdf):
         """Extract invoice metadata"""
         first_page = pdf.pages[0]
-        text = first_page.extract_text()
+        text = first_page.extract_text() or ''
+        full_text = '\n'.join((page.extract_text() or '') for page in pdf.pages)
         
         # Extract order number
-        order_match = re.search(r'ORDER # (\d+)', text)
+        order_match = re.search(r'ORDER #\s*(\d+)', text, re.IGNORECASE)
+        if not order_match:
+            order_match = re.search(r'Order #\s*(\d+)', text, re.IGNORECASE)
         self.invoice_info['order_number'] = order_match.group(1) if order_match else 'N/A'
         
         # Extract order date
-        date_match = re.search(r'ORDER DATE (\d{1,2}/\d{1,2}/\d{4})', text)
+        date_match = re.search(r'ORDER DATE\s*(\d{1,2}/\d{1,2}/\d{4})', text, re.IGNORECASE)
+        if not date_match:
+            date_match = re.search(r'Date:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})', text)
         self.invoice_info['order_date'] = date_match.group(1) if date_match else 'N/A'
         
         # Extract customer info
@@ -54,6 +211,16 @@ class LCBOInvoiceProcessor:
                         customer_name = lines[j].strip()
                         break
                 break
+
+        # New format fallback: use first name under Delivery Address in the order summary section.
+        if not customer_name:
+            full_lines = [line.strip() for line in full_text.split('\n') if line.strip()]
+            for i, line in enumerate(full_lines):
+                if line.lower() == 'delivery address' and i + 1 < len(full_lines):
+                    candidate = full_lines[i + 1].strip()
+                    if candidate and not self._is_noise_line(candidate):
+                        customer_name = candidate
+                        break
         
         self.invoice_info['customer_name'] = customer_name if customer_name else 'N/A'
         
@@ -63,6 +230,7 @@ class LCBOInvoiceProcessor:
         
     def extract_products(self, pdf):
         """Extract product information from all pages"""
+        # First, try the legacy tabular parser.
         for page_num, page in enumerate(pdf.pages):
             text = page.extract_text()
             lines = text.split('\n')
@@ -149,6 +317,10 @@ class LCBOInvoiceProcessor:
                         if product:
                             self.products.append(product)
                         used_lines.add(i)
+
+        # Fallback: new web-style invoice format (LCBO#: / Qty. Ordered blocks).
+        if not self.products:
+            self.products = self._extract_products_new_format(pdf)
     
     def parse_product_line(self, line, preceding_desc="", following_desc=""):
         """Parse a product line from invoice"""
@@ -282,21 +454,22 @@ class LCBOInvoiceProcessor:
         sorted_products = sorted(self.products, key=lambda p: p['description'].lower())
         
         # Products table - condensed columns
-        products_data = [['Received', 'Product #', 'Size (mL)', 'Description', 'DEP', 'Ordered', 'Shipped']]
+        products_data = [['Product #', 'Size (mL)', 'Description', 'DEP', 'Ordered', 'Shipped', 'Received']]
         
         for product in sorted_products:
             products_data.append([
-                '',  # Received checkbox/input left empty
                 product['product_number'],
                 product['size_ml'],
                 product['description'],  # Full description, no truncation
                 product['dep'],
                 str(product['ordered']),
-                str(product['shipped'])
+                str(product['shipped']),
+                '',  # Received checkbox/input left empty
             ])
         
         # Create products table with appropriate column widths
-        col_widths = [0.6*inch, 0.8*inch, 0.8*inch, 3.4*inch, 0.5*inch, 0.7*inch, 0.7*inch]
+        # Widths aligned to: Product #, Size, Description, DEP, Ordered, Shipped, Received
+        col_widths = [0.8*inch, 0.8*inch, 3.4*inch, 0.5*inch, 0.7*inch, 0.7*inch, 0.6*inch]
         products_table = Table(products_data, colWidths=col_widths)
         
         # Build table style with alternating row colors
@@ -306,9 +479,9 @@ class LCBOInvoiceProcessor:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Received column
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),   # Product # column
-            ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Size column
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),   # Product # column
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Size column
+            ('ALIGN', (6, 0), (6, -1), 'CENTER'),  # Received column
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('LEFTPADDING', (0, 0), (-1, -1), 3),
@@ -389,7 +562,7 @@ def main():
     import sys
     
     # Get PDF file
-    pdf_file = "Nov 19, 2025 invoice.pdf"
+    pdf_file = "./invoices/LCBO Invoice April 7 2026.pdf"
     
     if not os.path.exists(pdf_file):
         print(f"Error: {pdf_file} not found")
