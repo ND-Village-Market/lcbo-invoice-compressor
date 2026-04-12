@@ -23,7 +23,7 @@ class LCBOInvoiceProcessor:
         self.products = []
         self.invoice_info = {}
         # Columns to display in output
-        self.columns = ['product_number', 'size_ml', 'description', 'dep', 'ordered', 'shipped']
+        self.columns = ['product_number', 'size_ml', 'description', 'ordered', 'shipped']
 
     def _extract_size_ml(self, text):
         """Extract numeric size in mL from a text fragment."""
@@ -40,6 +40,16 @@ class LCBOInvoiceProcessor:
             if case_match:
                 return case_match.group(1)
         return ''
+
+    def _parse_fulfilled_by_line(self, line):
+        """Parse a 'Fulfilled by' line and return the supplier label, if present."""
+        fulfilled_match = re.search(r'Fulfilled\s+by:\s*(.+)$', line, re.IGNORECASE)
+        if not fulfilled_match:
+            return ''
+        fulfilled_by = fulfilled_match.group(1).strip()
+        # Trim trailing fulfillment method details to keep the section header concise.
+        fulfilled_by = re.sub(r'\s+Fulfillment\s+method\s*:.*$', '', fulfilled_by, flags=re.IGNORECASE).strip()
+        return fulfilled_by
 
     def _clean_product_name_line(self, line):
         """Strip pricing and noise from a product name line."""
@@ -89,12 +99,18 @@ class LCBOInvoiceProcessor:
     def _extract_products_new_format(self, pdf):
         """Extract products from the new LCBO web-style invoice format."""
         products = []
+        current_fulfilled_by = 'LCBO'
 
         for page in pdf.pages:
             text = page.extract_text() or ''
             lines = [line.strip() for line in text.split('\n') if line.strip()]
 
             for i, line in enumerate(lines):
+                parsed_fulfilled_by = self._parse_fulfilled_by_line(line)
+                if parsed_fulfilled_by:
+                    current_fulfilled_by = parsed_fulfilled_by
+                    continue
+
                 lcbo_match = re.search(r'LCBO#:\s*(\d+)\b(.*)$', line, re.IGNORECASE)
                 if not lcbo_match:
                     continue
@@ -105,6 +121,7 @@ class LCBOInvoiceProcessor:
                 case_units = self._extract_case_units(lines, i)
                 if case_units and size_ml:
                     size_ml = f"{case_units} x {size_ml}"
+                fulfilled_by = current_fulfilled_by
 
                 # Product name is usually on the line before LCBO#, with possible wrapped lines.
                 description_parts = []
@@ -162,6 +179,7 @@ class LCBOInvoiceProcessor:
                     'dep': '',
                     'ordered': ordered,
                     'shipped': shipped,
+                    'fulfilled_by': fulfilled_by,
                 }
                 products.append(product)
 
@@ -169,7 +187,12 @@ class LCBOInvoiceProcessor:
         unique_products = []
         seen_keys = set()
         for product in products:
-            key = (product['product_number'], product['description'], product['ordered'])
+            key = (
+                product['product_number'],
+                product['description'],
+                product['ordered'],
+                product.get('fulfilled_by', ''),
+            )
             if key in seen_keys:
                 continue
             seen_keys.add(key)
@@ -337,7 +360,8 @@ class LCBOInvoiceProcessor:
                 'description': '',
                 'dep': '',
                 'ordered': 0,
-                'shipped': 0
+                'shipped': 0,
+                'fulfilled_by': ''
             }
             
             # Size is in parts[1], may be single number or "X x YYY" format
@@ -450,26 +474,46 @@ class LCBOInvoiceProcessor:
         story.append(info_table)
         story.append(Spacer(1, 0.15*inch))
         
-        # Sort products by description (alphabetical)
-        sorted_products = sorted(self.products, key=lambda p: p['description'].lower())
-        
-        # Products table - condensed columns
-        products_data = [['Product #', 'Size (mL)', 'Description', 'DEP', 'Ordered', 'Shipped', 'Received']]
-        
-        for product in sorted_products:
-            products_data.append([
-                product['product_number'],
-                product['size_ml'],
-                product['description'],  # Full description, no truncation
-                product['dep'],
-                str(product['ordered']),
-                str(product['shipped']),
-                '',  # Received checkbox/input left empty
-            ])
+        # Build grouped rows by fulfillment source while preserving input order.
+        grouped_products = {}
+        group_order = []
+        for product in self.products:
+            fulfilled_by = (product.get('fulfilled_by') or '').strip() or 'LCBO'
+            if fulfilled_by not in grouped_products:
+                grouped_products[fulfilled_by] = []
+                group_order.append(fulfilled_by)
+            grouped_products[fulfilled_by].append(product)
+
+        # Products table - grouped by fulfillment source
+        products_data = [['Received', 'Product #', 'Size (mL)', 'Description', 'Ordered', 'Shipped', 'Display']]
+
+        section_rows = []
+        data_row_products = []
+        for fulfilled_by in group_order:
+            section_rows.append(len(products_data))
+            products_data.append([f"Fulfilled by: {fulfilled_by}", '', '', '', '', '', ''])
+
+            sorted_group_products = sorted(
+                grouped_products[fulfilled_by],
+                key=lambda p: (p.get('description', '').lower(), p.get('product_number', ''))
+            )
+
+            for product in sorted_group_products:
+                data_row_products.append(product)
+                products_data.append([
+                    '',  # Received checkbox/input left empty
+                    product['product_number'],
+                    product['size_ml'],
+                    product['description'],  # Full description, no truncation
+                    str(product['ordered']),
+                    str(product['shipped']),
+                    '',  # Display value left empty
+                ])
         
         # Create products table with appropriate column widths
-        # Widths aligned to: Product #, Size, Description, DEP, Ordered, Shipped, Received
-        col_widths = [0.8*inch, 0.8*inch, 3.4*inch, 0.5*inch, 0.7*inch, 0.7*inch, 0.6*inch]
+        # Widths aligned to: Received, Product #, Size, Description, Ordered, Shipped, Display
+        # Total width remains unchanged for consistent page layout.
+        col_widths = [0.6*inch, 0.8*inch, 0.8*inch, 3.3*inch, 0.7*inch, 0.7*inch, 0.6*inch]
         products_table = Table(products_data, colWidths=col_widths)
         
         # Build table style with alternating row colors
@@ -479,9 +523,10 @@ class LCBOInvoiceProcessor:
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),   # Product # column
-            ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Size column
-            ('ALIGN', (6, 0), (6, -1), 'CENTER'),  # Received column
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Received column
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),   # Product # column
+            ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Size column
+            ('ALIGN', (6, 0), (6, -1), 'CENTER'),  # Display column
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('LEFTPADDING', (0, 0), (-1, -1), 3),
@@ -491,17 +536,28 @@ class LCBOInvoiceProcessor:
         ]
         
         # Add alternating row colors and make rows bold where Ordered != Shipped
+        data_row_idx = 0
         for row_idx in range(1, len(products_data)):
-            # Alternating background colors
-            if row_idx % 2 == 0:
-                table_styles.append(('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#F0F0F0')))
-            else:
+            if row_idx in section_rows:
+                # Highlight the fulfillment section title and span across columns.
+                table_styles.append(('SPAN', (0, row_idx), (6, row_idx)))
+                table_styles.append(('FONT', (0, row_idx), (0, row_idx), 'Helvetica-Bold', 9))
+                table_styles.append(('BACKGROUND', (0, row_idx), (6, row_idx), colors.HexColor('#DCE6F1')))
+                table_styles.append(('ALIGN', (0, row_idx), (6, row_idx), 'LEFT'))
+                continue
+
+            # Alternating background colors for item rows only.
+            if data_row_idx % 2 == 0:
                 table_styles.append(('BACKGROUND', (0, row_idx), (-1, row_idx), colors.white))
-            
-            # Make row bold if Ordered != Shipped
-            product = sorted_products[row_idx - 1]
+            else:
+                table_styles.append(('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#F0F0F0')))
+
+            # Make row bold if Ordered != Shipped.
+            product = data_row_products[data_row_idx]
             if product['ordered'] != product['shipped']:
                 table_styles.append(('FONT', (0, row_idx), (-1, row_idx), 'Helvetica-Bold', 7.5))
+
+            data_row_idx += 1
         
         products_table.setStyle(TableStyle(table_styles))
         
