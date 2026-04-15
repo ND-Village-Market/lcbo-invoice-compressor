@@ -132,14 +132,16 @@ async def extract_supplier_csv(file: UploadFile = File(...)):
         extractor = SupplierCSVExtractor(str(source_pdf_path))
         suppliers = extractor.extract_suppliers()
 
-        csv_filename = file.filename.rsplit('.', 1)[0] + '_supplier_skus.csv'
-        csv_path = session_dir / csv_filename
-        row_count = extractor.generate_csv(str(csv_path))
+        base_name = file.filename.rsplit('.', 1)[0]
+        csv_files = extractor.generate_chunked_csvs(str(session_dir), base_name)
+        row_count = len(suppliers)
 
         return {
             "session_id": session_id,
             "original_file": file.filename,
-            "csv_file": csv_filename,
+            "csv_file": csv_files[0],
+            "csv_files": csv_files,
+            "csv_file_count": len(csv_files),
             "supplier_count": row_count,
             "status": "success" if suppliers else "empty"
         }
@@ -164,17 +166,18 @@ async def calculate_item_cost_csv(session_id: str, file: UploadFile = File(...))
     if not session_dir.exists():
         raise HTTPException(status_code=404, detail="Session not found")
 
-    supplier_csv_candidates = sorted(session_dir.glob('*_supplier_skus.csv'))
+    supplier_csv_candidates = sorted(session_dir.glob('*_supplier_skus*.csv'))
     if not supplier_csv_candidates:
         raise HTTPException(status_code=400, detail="Step 1 CSV not found for this session")
 
     allowed_items = set()
-    with supplier_csv_candidates[-1].open('r', encoding='utf-8') as csv_file:
-        reader = csv.DictReader(csv_file)
-        for row in reader:
-            sku = (row.get('sku') or '').strip()
-            if sku:
-                allowed_items.add(sku)
+    for csv_path in supplier_csv_candidates:
+        with csv_path.open('r', encoding='utf-8') as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                sku = (row.get('sku') or '').strip()
+                if sku:
+                    allowed_items.add(sku)
 
     if not allowed_items:
         raise HTTPException(status_code=400, detail="Step 1 CSV is empty")

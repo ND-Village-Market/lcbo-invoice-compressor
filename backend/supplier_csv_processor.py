@@ -14,6 +14,7 @@ class SupplierCSVExtractor:
     """Extract supplier numbers from item list PDFs and export CSV."""
 
     HEADER_MARKERS = ("PLU #", "Supplier #", "Qty/Case")
+    MAX_ROWS_PER_CSV = 250
 
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
@@ -103,3 +104,39 @@ class SupplierCSVExtractor:
                 writer.writerow([supplier, 1])
 
         return len(self.suppliers)
+
+    def generate_chunked_csvs(self, output_dir: str, base_name: str) -> list[str]:
+        """Generate 1+ CSV files with at most MAX_ROWS_PER_CSV rows each."""
+        if not self.suppliers:
+            self.extract_suppliers()
+
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        if not self.suppliers:
+            single_name = f"{base_name}_supplier_skus.csv"
+            self.generate_csv(str(output_path / single_name))
+            return [single_name]
+
+        if len(self.suppliers) <= self.MAX_ROWS_PER_CSV:
+            single_name = f"{base_name}_supplier_skus.csv"
+            self.generate_csv(str(output_path / single_name))
+            return [single_name]
+
+        file_names: list[str] = []
+        chunks = [
+            self.suppliers[i : i + self.MAX_ROWS_PER_CSV]
+            for i in range(0, len(self.suppliers), self.MAX_ROWS_PER_CSV)
+        ]
+
+        for idx, chunk in enumerate(chunks, start=1):
+            file_name = f"{base_name}_supplier_skus_part_{idx:03d}.csv"
+            file_path = output_path / file_name
+            with file_path.open("w", newline="", encoding="utf-8") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerow(["sku", "qty"])
+                for supplier in chunk:
+                    writer.writerow([supplier, 1])
+            file_names.append(file_name)
+
+        return file_names
