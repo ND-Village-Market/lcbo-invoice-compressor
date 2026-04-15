@@ -60,7 +60,9 @@ function App() {
             throw new Error('Step 1 must be completed before Step 2');
           }
           const formData = new FormData();
-          formData.append('file', files[0]);
+          files.forEach(file => {
+            formData.append('files', file);
+          });
 
           response = await fetch(
             `${API_URL}/calculate-item-cost-csv?session_id=${encodeURIComponent(sessionId)}`,
@@ -228,17 +230,17 @@ function App() {
 
                 {supplierStep === 2 && !itemCostResult && (
                   <div className="step-section">
-                    <h2>Step 2: Upload Quick Order PDF</h2>
+                    <h2>Step 2: Upload Quick Order PDF(s)</h2>
                     <p>
-                      Upload the wholesale pricing document to calculate item costs for Step 1 SKUs.
+                      Upload one or more wholesale pricing documents to calculate item costs for Step 1 SKUs.
                     </p>
                     <FileUpload
                       onUpload={handleUpload}
                       isProcessing={isProcessing}
-                      multiple={false}
-                      title="Drop Quick Order PDF here"
-                      subtitle="or click to select one PDF for cost calculation"
-                      submitLabel="Generate Step 2 Item Cost CSV"
+                      multiple={true}
+                      title="Drop Quick Order PDF file(s) here"
+                      subtitle="or click to select one or more PDFs for cost calculation"
+                      submitLabel="Generate Step 2 Item Cost CSV(s)"
                     />
                   </div>
                 )}

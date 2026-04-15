@@ -151,16 +151,19 @@ async def extract_supplier_csv(file: UploadFile = File(...)):
 
 
 @app.post("/calculate-item-cost-csv")
-async def calculate_item_cost_csv(session_id: str, file: UploadFile = File(...)):
+async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = File(...)):
     """
     Step 2: Upload a Quick Order PDF and generate item-cost CSV.
     Uses item numbers extracted in step 1 from the same session.
     """
-    if not file or not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
 
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
+    for file in files:
+        if not file or not file.filename:
+            raise HTTPException(status_code=400, detail="One or more files are missing")
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
 
     session_dir = UPLOAD_DIR / session_id
     if not session_dir.exists():
@@ -182,28 +185,40 @@ async def calculate_item_cost_csv(session_id: str, file: UploadFile = File(...))
     if not allowed_items:
         raise HTTPException(status_code=400, detail="Step 1 CSV is empty")
 
-    try:
-        quick_order_path = session_dir / file.filename
-        with open(quick_order_path, 'wb') as f:
-            content = await file.read()
-            f.write(content)
+    processing_results = []
 
-        calculator = WholesaleCostCalculator(str(quick_order_path))
-        rows = calculator.calculate_cost_rows(allowed_items)
+    for file in files:
+        try:
+            quick_order_path = session_dir / file.filename
+            with open(quick_order_path, 'wb') as f:
+                content = await file.read()
+                f.write(content)
 
-        output_filename = file.filename.rsplit('.', 1)[0] + '_item_costs.csv'
-        output_path = session_dir / output_filename
-        row_count = WholesaleCostCalculator.write_item_cost_csv(str(output_path), rows)
+            calculator = WholesaleCostCalculator(str(quick_order_path))
+            rows = calculator.calculate_cost_rows(allowed_items)
 
-        return {
-            "session_id": session_id,
-            "original_file": file.filename,
-            "csv_file": output_filename,
-            "item_count": row_count,
-            "status": "success" if row_count > 0 else "empty"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            output_filename = file.filename.rsplit('.', 1)[0] + '_item_costs.csv'
+            output_path = session_dir / output_filename
+            row_count = WholesaleCostCalculator.write_item_cost_csv(str(output_path), rows)
+
+            processing_results.append({
+                "original_file": file.filename,
+                "csv_file": output_filename,
+                "item_count": row_count,
+                "status": "success" if row_count > 0 else "empty"
+            })
+        except Exception as e:
+            processing_results.append({
+                "original_file": file.filename,
+                "status": "error",
+                "error": str(e)
+            })
+
+    return {
+        "session_id": session_id,
+        "files_uploaded": len(files),
+        "processing_results": processing_results,
+    }
 
 
 @app.get("/download/{session_id}/{filename}")

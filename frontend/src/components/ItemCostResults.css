@@ -26,6 +26,12 @@
   opacity: 0.9;
 }
 
+.item-cost-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
 .item-cost-results-card {
   display: flex;
   justify-content: space-between;
@@ -35,6 +41,10 @@
   border-radius: 8px;
   padding: 1rem;
   gap: 1rem;
+}
+
+.item-cost-results-card.error {
+  border-left-color: #f87171;
 }
 
 .item-cost-results-file h3 {
