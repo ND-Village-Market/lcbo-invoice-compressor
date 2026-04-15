@@ -17,7 +17,7 @@ app = FastAPI(title="LCBO Invoice Processor", version="1.0.0")
 # Use CORS_ORIGINS to override defaults when needed.
 cors_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://lcboic.netlify.app",
 )
 allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 
