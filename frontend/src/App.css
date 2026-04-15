@@ -113,6 +113,28 @@
   text-align: center;
 }
 
+.step-section {
+  width: 100%;
+  max-width: 600px;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+.step-section h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.step-section p {
+  opacity: 0.9;
+  margin-bottom: 0.9rem;
+}
+
 .reset-button {
   background-color: #667eea;
   color: white;

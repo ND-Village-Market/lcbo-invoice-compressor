@@ -3,6 +3,7 @@ import './App.css';
 import FileUpload from './components/FileUpload';
 import ProcessingResults from './components/ProcessingResults';
 import SupplierCsvResults from './components/SupplierCsvResults';
+import ItemCostResults from './components/ItemCostResults';
 
 // API URL - uses environment variable in production, localhost in development
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
@@ -12,6 +13,8 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [results, setResults] = useState([]);
   const [supplierCsvResult, setSupplierCsvResult] = useState(null);
+  const [supplierStep, setSupplierStep] = useState(1);
+  const [itemCostResult, setItemCostResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showWarmupHint, setShowWarmupHint] = useState(false);
   const [error, setError] = useState(null);
@@ -44,13 +47,29 @@ function App() {
           body: formData,
         });
       } else {
-        const formData = new FormData();
-        formData.append('file', files[0]);
+        if (supplierStep === 1) {
+          const formData = new FormData();
+          formData.append('file', files[0]);
 
-        response = await fetch(`${API_URL}/extract-supplier-csv`, {
-          method: 'POST',
-          body: formData,
-        });
+          response = await fetch(`${API_URL}/extract-supplier-csv`, {
+            method: 'POST',
+            body: formData,
+          });
+        } else {
+          if (!sessionId) {
+            throw new Error('Step 1 must be completed before Step 2');
+          }
+          const formData = new FormData();
+          formData.append('file', files[0]);
+
+          response = await fetch(
+            `${API_URL}/calculate-item-cost-csv?session_id=${encodeURIComponent(sessionId)}`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+        }
       }
 
       if (!response.ok) {
@@ -58,11 +77,17 @@ function App() {
       }
 
       const data = await response.json();
-      setSessionId(data.session_id);
+
       if (mode === 'invoice') {
+        setSessionId(data.session_id);
         setResults(data.processing_results);
       } else {
-        setSupplierCsvResult(data);
+        if (supplierStep === 1) {
+          setSessionId(data.session_id);
+          setSupplierCsvResult(data);
+        } else {
+          setItemCostResult(data);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -101,6 +126,8 @@ function App() {
     setSessionId(null);
     setResults([]);
     setSupplierCsvResult(null);
+    setSupplierStep(1);
+    setItemCostResult(null);
     setError(null);
   };
 
@@ -109,6 +136,13 @@ function App() {
     setSessionId(null);
     setResults([]);
     setSupplierCsvResult(null);
+    setSupplierStep(1);
+    setItemCostResult(null);
+    setError(null);
+  };
+
+  const handleContinueToStep2 = () => {
+    setSupplierStep(2);
     setError(null);
   };
 
@@ -121,7 +155,7 @@ function App() {
         <p>
           {isInvoiceMode
             ? 'Upload PDF invoices to process and download condensed versions'
-            : 'Upload an item list PDF to generate a supplier SKU CSV'}
+            : 'Step 1: Generate supplier SKU CSV, then Step 2: upload Quick Order PDF to calculate item costs'}
         </p>
         <div className="feature-switcher" role="tablist" aria-label="Feature switcher">
           <button
@@ -162,17 +196,17 @@ function App() {
             title={
               isInvoiceMode
                 ? 'Drop PDF files here'
-                : 'Drop item list PDF here'
+                : 'Step 1: Drop item list PDF here'
             }
             subtitle={
               isInvoiceMode
                 ? 'or click to select files'
-                : 'or click to select one PDF'
+                : 'or click to select one PDF for supplier extraction'
             }
             submitLabel={
               isInvoiceMode
                 ? 'Process Files'
-                : 'Generate Supplier CSV'
+                : 'Generate Step 1 Supplier CSV'
             }
           />
         ) : (
@@ -183,16 +217,45 @@ function App() {
                 onDownload={handleDownload}
               />
             ) : (
-              <SupplierCsvResults
-                result={supplierCsvResult}
-                onDownload={handleDownload}
-              />
+              <>
+                {supplierCsvResult && (
+                  <SupplierCsvResults
+                    result={supplierCsvResult}
+                    onDownload={handleDownload}
+                    onContinue={supplierStep === 1 ? handleContinueToStep2 : undefined}
+                  />
+                )}
+
+                {supplierStep === 2 && !itemCostResult && (
+                  <div className="step-section">
+                    <h2>Step 2: Upload Quick Order PDF</h2>
+                    <p>
+                      Upload the wholesale pricing document to calculate item costs for Step 1 SKUs.
+                    </p>
+                    <FileUpload
+                      onUpload={handleUpload}
+                      isProcessing={isProcessing}
+                      multiple={false}
+                      title="Drop Quick Order PDF here"
+                      subtitle="or click to select one PDF for cost calculation"
+                      submitLabel="Generate Step 2 Item Cost CSV"
+                    />
+                  </div>
+                )}
+
+                {itemCostResult && (
+                  <ItemCostResults
+                    result={itemCostResult}
+                    onDownload={handleDownload}
+                  />
+                )}
+              </>
             )}
             <button 
               className="reset-button"
               onClick={handleReset}
             >
-              {isInvoiceMode ? 'Process More Files' : 'Generate Another CSV'}
+              {isInvoiceMode ? 'Process More Files' : 'Start New Two-Step Run'}
             </button>
           </>
         )}

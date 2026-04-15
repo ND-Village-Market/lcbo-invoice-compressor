@@ -2,6 +2,7 @@ import shutil
 import tempfile
 from pathlib import Path
 import uuid
+import csv
 import os
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pdf_processor import LCBOInvoiceProcessor
 from supplier_csv_processor import SupplierCSVExtractor
+from wholesale_cost_processor import WholesaleCostCalculator
 
 app = FastAPI(title="LCBO Invoice Processor", version="1.0.0")
 
@@ -143,6 +145,61 @@ async def extract_supplier_csv(file: UploadFile = File(...)):
         }
     except Exception as e:
         shutil.rmtree(session_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/calculate-item-cost-csv")
+async def calculate_item_cost_csv(session_id: str, file: UploadFile = File(...)):
+    """
+    Step 2: Upload a Quick Order PDF and generate item-cost CSV.
+    Uses item numbers extracted in step 1 from the same session.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
+
+    session_dir = UPLOAD_DIR / session_id
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    supplier_csv_candidates = sorted(session_dir.glob('*_supplier_skus.csv'))
+    if not supplier_csv_candidates:
+        raise HTTPException(status_code=400, detail="Step 1 CSV not found for this session")
+
+    allowed_items = set()
+    with supplier_csv_candidates[-1].open('r', encoding='utf-8') as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            sku = (row.get('sku') or '').strip()
+            if sku:
+                allowed_items.add(sku)
+
+    if not allowed_items:
+        raise HTTPException(status_code=400, detail="Step 1 CSV is empty")
+
+    try:
+        quick_order_path = session_dir / file.filename
+        with open(quick_order_path, 'wb') as f:
+            content = await file.read()
+            f.write(content)
+
+        calculator = WholesaleCostCalculator(str(quick_order_path))
+        rows = calculator.calculate_cost_rows(allowed_items)
+
+        output_filename = file.filename.rsplit('.', 1)[0] + '_item_costs.csv'
+        output_path = session_dir / output_filename
+        row_count = WholesaleCostCalculator.write_item_cost_csv(str(output_path), rows)
+
+        return {
+            "session_id": session_id,
+            "original_file": file.filename,
+            "csv_file": output_filename,
+            "item_count": row_count,
+            "status": "success" if row_count > 0 else "empty"
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
