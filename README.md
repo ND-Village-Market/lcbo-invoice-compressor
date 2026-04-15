@@ -1,147 +1,136 @@
-# LCBO Invoice PDF Processor
+# LCBO Document Tools
 
-A Python tool that processes LCBO (Ontario Liquor Commission Board) invoice PDFs to remove unnecessary information, reformat data, and create more concise, readable PDFs.
+Web app for processing LCBO PDFs.
+
+It currently supports:
+- Invoice condenser: upload invoice PDFs and download condensed PDF versions
+- Supplier CSV extractor: upload item-list PDFs and generate CSV with `sku,qty`
+
+## Tech Stack
+
+- Backend: FastAPI + pdfplumber + reportlab
+- Frontend: React (Create React App)
+
+## Local Development Setup
+
+### Prerequisites
+
+- Python 3.10+ (3.11+ recommended)
+- Node.js 18+ and npm
+
+### 1. Clone and enter the project
+
+```bash
+git clone <your-repo-url>
+cd lcbo-invoice-compressor
+```
+
+### 2. Set up backend
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Set up frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+```
+
+## Run Locally (Backend + Frontend)
+
+### Terminal A: start backend API
+
+```bash
+cd backend
+source venv/bin/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+```
+
+Backend endpoints:
+- API base: http://localhost:8001
+- Swagger docs: http://localhost:8001/docs
+- Health check: http://localhost:8001/health
+
+### Terminal B: start frontend
+
+```bash
+cd frontend
+npm start
+```
+
+Frontend app:
+- http://localhost:3000
+
+Notes:
+- In development, frontend defaults to `http://localhost:8001` for API calls.
+- If you want to point to a different API URL, set `REACT_APP_API_URL` before `npm start`.
+
+## Optional One-Command Scripts
+
+From project root:
+
+```bash
+./scripts/setup_web.sh
+./scripts/start.sh
+```
+
+These scripts create backend venv (if missing), install dependencies, and start both servers.
 
 ## Features
 
-- **Consolidates multi-page invoices** into clean, condensed documents
-- **Removes redundant information** (headers, footers, deposit columns)
-- **Extracts key data**: Order #, Date, Customer, Items, Totals
-- **Compact table layout** displaying only essential information
-- **Significant file size reduction** (92KB → 5.2KB in test)
-- **Batch processing** capability for multiple invoices
-- **Professional formatting** with proper styling and alignment
+- Condense multi-page invoices into cleaner PDFs
+- Remove repetitive invoice noise while preserving key order/item details
+- Extract supplier numbers from item-list PDFs
+- Normalize supplier values to digits only with leading zeros removed
+- Export spreadsheet-friendly CSV with columns `sku,qty` (qty always `1`)
 
-## What Gets Removed
+## Project Structure
 
-- Repetitive page headers and footers on each page
-- Deposit percentage column (not useful for review)
-- Redundant customer information across pages
-- Excess whitespace and formatting
-
-## What Gets Kept/Improved
-
-- Product descriptions (first 40 characters)
-- Order quantities
-- Discount prices (more relevant than retail)
-- Line item totals
-- Summary totals with HST calculation
-- Key invoice metadata (Order #, Date, Customer, etc.)
-
-## Installation
-
-```bash
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install pypdf2 reportlab pdfplumber pillow
+```text
+backend/
+   main.py
+   pdf_processor.py
+   supplier_csv_processor.py
+   requirements.txt
+frontend/
+   package.json
+   src/
+scripts/
+   setup_web.sh
+   start.sh
 ```
-
-## Usage
-
-### Single PDF Processing
-
-```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Process a single PDF
-python3 pdf_processor.py
-```
-
-This will:
-- Look for `Nov 19, 2025 invoice.pdf` in the current directory
-- Extract and analyze all invoice data
-- Create `Nov 19, 2025 invoice_condensed.pdf`
-- Display summary information
-
-### Batch Processing
-
-```bash
-# Process all PDFs in current directory
-python3 batch_process.py
-
-# Process all PDFs in a specific directory
-python3 batch_process.py /path/to/pdf/directory
-```
-
-This will:
-- Find all PDF files in the directory
-- Process each one sequentially
-- Create condensed versions with `_condensed.pdf` suffix
-- Display a summary report
-
-## Output
-
-The condensed PDF includes:
-
-1. **Header Section**
-   - Order number and date
-   - Customer name and number
-
-2. **Products Table**
-   - Product name (truncated)
-   - Size in mL
-   - Quantity ordered
-   - Discount price per unit
-   - Extended total
-
-3. **Summary Section**
-   - Subtotal
-   - HST (13% for Ontario)
-   - Final total
-
-## File Size Comparison
-
-- Original invoice: 92 KB (4 pages with repetitive formatting)
-- Condensed invoice: 5.2 KB (typically 1-2 pages)
-- **Reduction: ~94%**
-
-## Customization
-
-Edit `pdf_processor.py` to customize:
-
-- Column widths in the products table
-- Font sizes and colors
-- Included/excluded columns
-- Rounding and formatting
-- Page size and margins
-
-## Requirements
-
-- Python 3.7+
-- pdfplumber (PDF text extraction)
-- reportlab (PDF generation)
-- pypdf2 (PDF manipulation)
-- pillow (Image processing)
-
-## License
-
-Free to use and modify for your needs.
 
 ## Troubleshooting
 
-**"External managed environment" error during pip install:**
-- Use the provided virtual environment setup
-- Or use: `pip install --break-system-packages` (not recommended)
+### Backend imports unresolved in editor
 
-**Generated PDF is blank:**
-- Check that the input PDF has extractable text
-- Verify the PDF format is compatible
-- Check file permissions
+Your editor may be using a different Python interpreter.
+Select `backend/venv/bin/python` as the active Python interpreter.
 
-**Incorrect data extraction:**
-- Verify the PDF format matches LCBO standard invoices
-- Modify regex patterns in `extract_invoice_info()` if needed
-- Check the `parse_product_line()` method for custom formats
+### CORS / API connection issues
 
-## Future Enhancements
+- Confirm backend is running on port `8001`
+- Confirm frontend is running on port `3000`
+- Confirm `REACT_APP_API_URL` (if set) points to the correct backend URL
 
-- Support for other PDF invoice formats
-- Custom column selection
-- Multi-invoice comparison reports
-- CSV export option
-- Web interface
-- Automated scheduling
+### npm start fails
+
+Delete and reinstall dependencies:
+
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+npm start
+```
+
+## License
+
+Free to use and modify.

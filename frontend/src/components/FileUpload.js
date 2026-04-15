@@ -1,10 +1,22 @@
 import React, { useRef, useState } from 'react';
 import './FileUpload.css';
 
-function FileUpload({ onUpload, isProcessing }) {
+function FileUpload({
+  onUpload,
+  isProcessing,
+  multiple = true,
+  title = 'Drop PDF files here',
+  subtitle = 'or click to select files',
+  submitLabel = 'Process Files',
+}) {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
+
+  const selectFiles = (files) => {
+    if (!files.length) return;
+    setSelectedFiles(multiple ? files : [files[0]]);
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -25,18 +37,14 @@ function FileUpload({ onUpload, isProcessing }) {
       file.type === 'application/pdf'
     );
 
-    if (files.length > 0) {
-      setSelectedFiles(files);
-    }
+    selectFiles(files);
   };
 
   const handleFileSelect = (e) => {
     const files = [...e.target.files].filter(file => 
       file.type === 'application/pdf'
     );
-    if (files.length > 0) {
-      setSelectedFiles(files);
-    }
+    selectFiles(files);
   };
 
   const handleClick = () => {
@@ -67,7 +75,7 @@ function FileUpload({ onUpload, isProcessing }) {
         <input
           ref={fileInputRef}
           type="file"
-          multiple
+          multiple={multiple}
           accept=".pdf"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
@@ -85,8 +93,8 @@ function FileUpload({ onUpload, isProcessing }) {
             <polyline points="17 8 12 3 7 8"></polyline>
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
-          <h2>Drop PDF files here</h2>
-          <p>or click to select files</p>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
           <p className="file-types">Supported: PDF</p>
         </div>
       </div>
@@ -116,7 +124,7 @@ function FileUpload({ onUpload, isProcessing }) {
             onClick={handleSubmit}
             disabled={isProcessing}
           >
-            {isProcessing ? 'Processing...' : 'Process Files'}
+            {isProcessing ? 'Processing...' : submitLabel}
           </button>
         </div>
       )}

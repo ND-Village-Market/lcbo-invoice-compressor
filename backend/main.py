@@ -1,21 +1,29 @@
-import os
 import shutil
 import tempfile
 from pathlib import Path
 import uuid
+import os
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from pdf_processor import LCBOInvoiceProcessor
+from supplier_csv_processor import SupplierCSVExtractor
 
 app = FastAPI(title="LCBO Invoice Processor", version="1.0.0")
 
-# Add CORS middleware to allow requests from frontend
+# Add CORS middleware to allow requests from local frontend origins.
+# Use CORS_ORIGINS to override defaults when needed.
+cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+)
+allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,6 +106,46 @@ async def upload_pdfs(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/extract-supplier-csv")
+async def extract_supplier_csv(file: UploadFile = File(...)):
+    """
+    Upload a PDF item list and generate supplier CSV.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
+
+    session_id = str(uuid.uuid4())
+    session_dir = UPLOAD_DIR / session_id
+    session_dir.mkdir(exist_ok=True)
+
+    try:
+        source_pdf_path = session_dir / file.filename
+        with open(source_pdf_path, 'wb') as f:
+            content = await file.read()
+            f.write(content)
+
+        extractor = SupplierCSVExtractor(str(source_pdf_path))
+        suppliers = extractor.extract_suppliers()
+
+        csv_filename = file.filename.rsplit('.', 1)[0] + '_supplier_skus.csv'
+        csv_path = session_dir / csv_filename
+        row_count = extractor.generate_csv(str(csv_path))
+
+        return {
+            "session_id": session_id,
+            "original_file": file.filename,
+            "csv_file": csv_filename,
+            "supplier_count": row_count,
+            "status": "success" if suppliers else "empty"
+        }
+    except Exception as e:
+        shutil.rmtree(session_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/download/{session_id}/{filename}")
 async def download_pdf(session_id: str, filename: str):
     """
@@ -108,10 +156,14 @@ async def download_pdf(session_id: str, filename: str):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     
+    media_type = "application/pdf"
+    if filename.lower().endswith('.csv'):
+        media_type = "text/csv"
+
     return FileResponse(
         path=file_path,
         filename=filename,
-        media_type="application/pdf"
+        media_type=media_type
     )
 
 
@@ -148,4 +200,4 @@ async def cleanup_session(session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8001")))

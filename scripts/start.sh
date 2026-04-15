@@ -21,7 +21,7 @@ cd ..
 # Start backend in background
 echo "Starting backend server..."
 source backend/venv/bin/activate
-python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000 &
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001 &
 BACKEND_PID=$!
 
 # Check if frontend dependencies are installed
