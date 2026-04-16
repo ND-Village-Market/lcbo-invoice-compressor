@@ -10,11 +10,11 @@ function SupplierCsvResults({ result, onDownload, onContinue }) {
   return (
     <div className="supplier-results">
       <div className="supplier-results-summary">
-        <h2>Supplier CSV Ready</h2>
+        <h2>Vendor SKU CSV Ready</h2>
         <p>
           {hasRows
-            ? `Extracted ${result.supplier_count} supplier values from ${result.original_file}`
-            : `No supplier values found in ${result.original_file}`}
+            ? `Extracted ${result.supplier_count} Vendor SKU values from ${result.original_file}`
+            : `No Vendor SKU values found in ${result.original_file}`}
         </p>
         {hasRows && csvFiles.length > 1 && (
           <p className="supplier-results-split-note">

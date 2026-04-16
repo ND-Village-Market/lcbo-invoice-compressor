@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Supplier CSV extractor for item-list PDFs.
+Step 1 SKU extractor for PLU list PDFs.
 """
 
 import csv
@@ -11,9 +11,8 @@ import pdfplumber
 
 
 class SupplierCSVExtractor:
-    """Extract supplier numbers from item list PDFs and export CSV."""
+    """Extract vendor SKU values from PLU list PDFs and export CSV."""
 
-    HEADER_MARKERS = ("PLU #", "Supplier #", "Qty/Case")
     MAX_ROWS_PER_CSV = 250
 
     def __init__(self, pdf_path: str):
@@ -21,70 +20,98 @@ class SupplierCSVExtractor:
         self.suppliers = []
 
     @staticmethod
-    def _normalize_supplier(raw_value: str) -> str | None:
-        """Keep digits only and strip leading zeros."""
-        digits_only = re.sub(r"\D", "", raw_value)
-        if not digits_only:
-            return None
+    def _is_noise_line(line: str) -> bool:
+        if not line:
+            return True
 
-        normalized = digits_only.lstrip("0")
-        return normalized if normalized else "0"
+        lowered = line.lower().strip()
+        if not lowered:
+            return True
+
+        noise_prefixes = (
+            "plu list with cost and active price",
+            "printed:",
+            "item group:",
+            "price group:",
+            "cost group:",
+            "from plu:",
+            "# description vendor sku",
+            "new dundee village market",
+        )
+        if lowered.startswith(noise_prefixes):
+            return True
+
+        if re.fullmatch(r"\d+\s*/\s*\d+", lowered):
+            return True
+
+        if re.fullmatch(r"page\s*\d+\s*/\s*\d+", lowered):
+            return True
+
+        if re.fullmatch(r"\(\d{3}\)\s*\d{3}-\d{4}", lowered):
+            return True
+
+        return False
 
     @staticmethod
-    def _extract_supplier_from_row(line: str) -> str | None:
-        """
-        Extract supplier column value from an item row.
+    def _is_section_heading(line: str) -> bool:
+        return bool(re.fullmatch(r"\d{1,2}\s+[A-Z][A-Z0-9\s&\-/]+", line.strip()))
 
-        Expected row tail shape resembles:
-        <supplier-ish tokens> <qty> <case_cost> <unit_cost>
-        """
-        # Skip obvious non-row lines.
-        if not line or not line[:1].isdigit():
-            return None
+    @staticmethod
+    def _normalize_row_text(row_text: str) -> str:
+        normalized = re.sub(r"\s+", " ", row_text).strip()
+        normalized = re.sub(r"(\d)\.\s+(\d{1,2})(?=\s|$)", r"\1.\2", normalized)
+        return normalized
 
-        tokens = line.split()
-        if len(tokens) < 5:
-            return None
-
-        money_pattern = re.compile(r"^\d[\d,]*\.\d{2}$")
-        if not money_pattern.fullmatch(tokens[-1]):
-            return None
-        if not money_pattern.fullmatch(tokens[-2]):
-            return None
-        if not tokens[-3].isdigit():
+    def _extract_supplier_from_row(self, row_text: str) -> str | None:
+        row_text = self._normalize_row_text(row_text)
+        match = re.match(
+            r"^(?P<plu>\d{12,14})\s+(?P<body>.+?)\s+\$(?P<price>\d[\d,]*\.\d{2})\s+\$(?P<cost>\d[\d,]*\.\d{2})\s+\$(?P<profit>\d[\d,]*\.\d{2})\s+(?P<profit_percent>-?\d+(?:\.\d+)?)$",
+            row_text,
+        )
+        if not match:
             return None
 
-        # Walk left from qty to find the closest numeric token used as supplier.
-        # Exclude token[0] (PLU) and ignore short numeric description fragments.
-        for idx in range(len(tokens) - 4, 0, -1):
-            token = tokens[idx]
-            if token.isdigit() and 3 <= len(token) <= 8:
-                return SupplierCSVExtractor._normalize_supplier(token)
+        body = match.group("body").strip()
+        tokens = body.split()
+        if not tokens:
+            return None
+
+        for idx in range(len(tokens) - 1, -1, -1):
+            if re.fullmatch(r"\d{5,6}", tokens[idx]):
+                return tokens[idx]
 
         return None
 
     def extract_suppliers(self) -> list[str]:
-        """Extract suppliers from all item rows in the PDF."""
-        extracted = []
+        """Extract vendor SKUs from all PLU rows in the PDF."""
+        row_candidates: list[str] = []
+        current_row = ""
 
         with pdfplumber.open(self.pdf_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text() or ""
-                lines = [line.strip() for line in text.split("\n") if line.strip()]
+                for raw_line in text.split("\n"):
+                    line = raw_line.strip()
+                    if self._is_noise_line(line):
+                        continue
+                    if self._is_section_heading(line):
+                        continue
 
-                header_idx = -1
-                for idx, line in enumerate(lines):
-                    if all(marker in line for marker in self.HEADER_MARKERS):
-                        header_idx = idx
-                        break
+                    if re.match(r"^\d{12,14}\b", line):
+                        if current_row:
+                            row_candidates.append(current_row)
+                        current_row = line
+                    elif current_row:
+                        current_row = f"{current_row} {line}"
 
-                if header_idx == -1:
-                    continue
+        if current_row:
+            row_candidates.append(current_row)
 
-                for line in lines[header_idx + 1 :]:
-                    supplier = self._extract_supplier_from_row(line)
-                    if supplier is not None:
-                        extracted.append(supplier)
+        extracted: list[str] = []
+        for row_text in row_candidates:
+            vendor_sku = self._extract_supplier_from_row(row_text)
+            if vendor_sku is not None:
+                extracted.append(vendor_sku)
 
         self.suppliers = extracted
         return extracted

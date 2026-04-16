@@ -175,7 +175,7 @@ function App() {
           {isInvoiceMode
             ? 'Upload PDF invoices to process and download condensed versions'
             : isSupplierMode
-              ? 'Step 1: Generate supplier SKU CSV, then Step 2: upload Quick Order PDF to calculate item costs'
+              ? 'Step 1: Upload PLU list with cost and active price PDF to generate Vendor SKU CSV, then Step 2: upload Quick Order PDF to calculate item costs'
               : 'Upload PLU list PDF to export all row columns into a CSV sorted by %Profit'}
         </p>
         <div className="feature-switcher" role="tablist" aria-label="Feature switcher">
@@ -224,21 +224,21 @@ function App() {
               isInvoiceMode
                 ? 'Drop PDF files here'
                 : isSupplierMode
-                  ? 'Step 1: Drop item list PDF here'
+                  ? 'Step 1: Drop PLU list with cost and active price PDF here'
                   : 'Drop PLU list PDF here'
             }
             subtitle={
               isInvoiceMode
                 ? 'or click to select files'
                 : isSupplierMode
-                  ? 'or click to select one PDF for supplier extraction'
+                  ? 'or click to select one PDF for Vendor SKU extraction'
                   : 'or click to select one PDF to export sorted PLU rows'
             }
             submitLabel={
               isInvoiceMode
                 ? 'Process Files'
                 : isSupplierMode
-                  ? 'Generate Step 1 Supplier CSV'
+                  ? 'Generate Step 1 Vendor SKU CSV'
                   : 'Generate PLU Profit CSV'
             }
           />
