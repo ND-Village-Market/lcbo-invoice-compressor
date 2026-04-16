@@ -153,7 +153,7 @@ async def extract_supplier_csv(file: UploadFile = File(...)):
 @app.post("/calculate-item-cost-csv")
 async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = File(...)):
     """
-    Step 2: Upload a Quick Order PDF and generate item-cost CSV.
+    Step 2: Upload one or more Quick Order PDFs and generate one combined item-cost CSV.
     Uses item numbers extracted in step 1 from the same session.
     """
     if not files:
@@ -186,6 +186,7 @@ async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = Fil
         raise HTTPException(status_code=400, detail="Step 1 CSV is empty")
 
     processing_results = []
+    combined_rows: list[tuple[str, float]] = []
 
     for file in files:
         try:
@@ -196,14 +197,11 @@ async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = Fil
 
             calculator = WholesaleCostCalculator(str(quick_order_path))
             rows = calculator.calculate_cost_rows(allowed_items)
-
-            output_filename = file.filename.rsplit('.', 1)[0] + '_item_costs.csv'
-            output_path = session_dir / output_filename
-            row_count = WholesaleCostCalculator.write_item_cost_csv(str(output_path), rows)
+            combined_rows.extend(rows)
+            row_count = len(rows)
 
             processing_results.append({
                 "original_file": file.filename,
-                "csv_file": output_filename,
                 "item_count": row_count,
                 "status": "success" if row_count > 0 else "empty"
             })
@@ -214,9 +212,21 @@ async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = Fil
                 "error": str(e)
             })
 
+    output_filename = "combined_quick_orders_item_costs.csv"
+    output_path = session_dir / output_filename
+    total_item_count = WholesaleCostCalculator.write_item_cost_csv(str(output_path), combined_rows)
+
+    success_file_count = sum(1 for result in processing_results if result.get("status") in {"success", "empty"})
+    error_file_count = sum(1 for result in processing_results if result.get("status") == "error")
+
     return {
         "session_id": session_id,
         "files_uploaded": len(files),
+        "source_files_processed": success_file_count,
+        "source_files_failed": error_file_count,
+        "csv_file": output_filename,
+        "item_count": total_item_count,
+        "status": "success" if total_item_count > 0 else "empty",
         "processing_results": processing_results,
     }
 

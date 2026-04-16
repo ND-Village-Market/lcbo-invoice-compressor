@@ -232,15 +232,15 @@ function App() {
                   <div className="step-section">
                     <h2>Step 2: Upload Quick Order PDF(s)</h2>
                     <p>
-                      Upload one or more wholesale pricing documents to calculate item costs for Step 1 SKUs.
+                      Upload one or more wholesale pricing documents to create one combined item cost CSV for Step 1 SKUs.
                     </p>
                     <FileUpload
                       onUpload={handleUpload}
                       isProcessing={isProcessing}
                       multiple={true}
                       title="Drop Quick Order PDF file(s) here"
-                      subtitle="or click to select one or more PDFs for cost calculation"
-                      submitLabel="Generate Step 2 Item Cost CSV(s)"
+                      subtitle="or click to select one or more PDFs for a single combined cost CSV"
+                      submitLabel="Generate Combined Step 2 Item Cost CSV"
                     />
                   </div>
                 )}

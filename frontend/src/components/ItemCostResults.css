@@ -26,12 +26,6 @@
   opacity: 0.9;
 }
 
-.item-cost-results-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
 .item-cost-results-card {
   display: flex;
   justify-content: space-between;
@@ -41,10 +35,6 @@
   border-radius: 8px;
   padding: 1rem;
   gap: 1rem;
-}
-
-.item-cost-results-card.error {
-  border-left-color: #f87171;
 }
 
 .item-cost-results-file h3 {
@@ -86,6 +76,29 @@
 .item-cost-download-btn svg {
   width: 18px;
   height: 18px;
+}
+
+.item-cost-warning {
+  margin-top: 1rem;
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.item-cost-warning h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.item-cost-warning ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.item-cost-warning li {
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 @media (max-width: 600px) {
