@@ -235,7 +235,7 @@ async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = Fil
 @app.post("/extract-plu-profit-csv")
 async def extract_plu_profit_csv(file: UploadFile = File(...)):
     """
-    Upload a PLU PDF document and generate CSV rows sorted by %Profit.
+    Upload a PLU PDF document and generate CSV rows sorted by %Profit (low to high).
     """
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")

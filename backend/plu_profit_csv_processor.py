@@ -133,7 +133,7 @@ class PluProfitCSVExtractor:
             if parsed:
                 rows.append(parsed)
 
-        rows.sort(key=lambda row: float(row['profit_percent']), reverse=True)
+        rows.sort(key=lambda row: float(row['profit_percent']))
         self.rows = rows
         return rows
 
