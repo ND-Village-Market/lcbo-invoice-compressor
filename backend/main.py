@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pdf_processor import LCBOInvoiceProcessor
 from supplier_csv_processor import SupplierCSVExtractor
 from wholesale_cost_processor import WholesaleCostCalculator
+from plu_profit_csv_processor import PluProfitCSVExtractor
 
 app = FastAPI(title="LCBO Invoice Processor", version="1.0.0")
 
@@ -229,6 +230,45 @@ async def calculate_item_cost_csv(session_id: str, files: list[UploadFile] = Fil
         "status": "success" if total_item_count > 0 else "empty",
         "processing_results": processing_results,
     }
+
+
+@app.post("/extract-plu-profit-csv")
+async def extract_plu_profit_csv(file: UploadFile = File(...)):
+    """
+    Upload a PLU PDF document and generate CSV rows sorted by %Profit.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail=f"File {file.filename} is not a PDF")
+
+    session_id = str(uuid.uuid4())
+    session_dir = UPLOAD_DIR / session_id
+    session_dir.mkdir(exist_ok=True)
+
+    try:
+        source_pdf_path = session_dir / file.filename
+        with open(source_pdf_path, 'wb') as f:
+            content = await file.read()
+            f.write(content)
+
+        extractor = PluProfitCSVExtractor(str(source_pdf_path))
+        rows = extractor.extract_rows()
+
+        base_name = file.filename.rsplit('.', 1)[0]
+        csv_file = extractor.write_csv(str(session_dir), base_name)
+
+        return {
+            "session_id": session_id,
+            "original_file": file.filename,
+            "csv_file": csv_file,
+            "row_count": len(rows),
+            "status": "success" if rows else "empty"
+        }
+    except Exception as e:
+        shutil.rmtree(session_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/download/{session_id}/{filename}")

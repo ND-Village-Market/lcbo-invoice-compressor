@@ -4,6 +4,7 @@ import FileUpload from './components/FileUpload';
 import ProcessingResults from './components/ProcessingResults';
 import SupplierCsvResults from './components/SupplierCsvResults';
 import ItemCostResults from './components/ItemCostResults';
+import PluProfitResults from './components/PluProfitResults';
 
 // API URL - uses environment variable in production, localhost in development
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
@@ -15,6 +16,7 @@ function App() {
   const [supplierCsvResult, setSupplierCsvResult] = useState(null);
   const [supplierStep, setSupplierStep] = useState(1);
   const [itemCostResult, setItemCostResult] = useState(null);
+  const [pluProfitResult, setPluProfitResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showWarmupHint, setShowWarmupHint] = useState(false);
   const [error, setError] = useState(null);
@@ -46,7 +48,7 @@ function App() {
           method: 'POST',
           body: formData,
         });
-      } else {
+      } else if (mode === 'supplier-csv') {
         if (supplierStep === 1) {
           const formData = new FormData();
           formData.append('file', files[0]);
@@ -72,6 +74,14 @@ function App() {
             }
           );
         }
+      } else {
+        const formData = new FormData();
+        formData.append('file', files[0]);
+
+        response = await fetch(`${API_URL}/extract-plu-profit-csv`, {
+          method: 'POST',
+          body: formData,
+        });
       }
 
       if (!response.ok) {
@@ -83,13 +93,16 @@ function App() {
       if (mode === 'invoice') {
         setSessionId(data.session_id);
         setResults(data.processing_results);
-      } else {
+      } else if (mode === 'supplier-csv') {
         if (supplierStep === 1) {
           setSessionId(data.session_id);
           setSupplierCsvResult(data);
         } else {
           setItemCostResult(data);
         }
+      } else {
+        setSessionId(data.session_id);
+        setPluProfitResult(data);
       }
     } catch (err) {
       setError(err.message);
@@ -130,6 +143,7 @@ function App() {
     setSupplierCsvResult(null);
     setSupplierStep(1);
     setItemCostResult(null);
+    setPluProfitResult(null);
     setError(null);
   };
 
@@ -140,6 +154,7 @@ function App() {
     setSupplierCsvResult(null);
     setSupplierStep(1);
     setItemCostResult(null);
+    setPluProfitResult(null);
     setError(null);
   };
 
@@ -149,6 +164,8 @@ function App() {
   };
 
   const isInvoiceMode = mode === 'invoice';
+  const isSupplierMode = mode === 'supplier-csv';
+  const isPluMode = mode === 'plu-profit';
 
   return (
     <div className="app">
@@ -157,7 +174,9 @@ function App() {
         <p>
           {isInvoiceMode
             ? 'Upload PDF invoices to process and download condensed versions'
-            : 'Step 1: Generate supplier SKU CSV, then Step 2: upload Quick Order PDF to calculate item costs'}
+            : isSupplierMode
+              ? 'Step 1: Generate supplier SKU CSV, then Step 2: upload Quick Order PDF to calculate item costs'
+              : 'Upload PLU list PDF to export all row columns into a CSV sorted by %Profit'}
         </p>
         <div className="feature-switcher" role="tablist" aria-label="Feature switcher">
           <button
@@ -167,10 +186,16 @@ function App() {
             Invoice Condenser
           </button>
           <button
-            className={`feature-switch-btn ${!isInvoiceMode ? 'active' : ''}`}
+            className={`feature-switch-btn ${isSupplierMode ? 'active' : ''}`}
             onClick={() => handleModeChange('supplier-csv')}
           >
             Supplier CSV Extractor
+          </button>
+          <button
+            className={`feature-switch-btn ${isPluMode ? 'active' : ''}`}
+            onClick={() => handleModeChange('plu-profit')}
+          >
+            PLU Profit CSV
           </button>
         </div>
       </header>
@@ -194,21 +219,27 @@ function App() {
           <FileUpload 
             onUpload={handleUpload} 
             isProcessing={isProcessing}
-            multiple={isInvoiceMode}
+            multiple={isInvoiceMode || (isSupplierMode && supplierStep === 2)}
             title={
               isInvoiceMode
                 ? 'Drop PDF files here'
-                : 'Step 1: Drop item list PDF here'
+                : isSupplierMode
+                  ? 'Step 1: Drop item list PDF here'
+                  : 'Drop PLU list PDF here'
             }
             subtitle={
               isInvoiceMode
                 ? 'or click to select files'
-                : 'or click to select one PDF for supplier extraction'
+                : isSupplierMode
+                  ? 'or click to select one PDF for supplier extraction'
+                  : 'or click to select one PDF to export sorted PLU rows'
             }
             submitLabel={
               isInvoiceMode
                 ? 'Process Files'
-                : 'Generate Step 1 Supplier CSV'
+                : isSupplierMode
+                  ? 'Generate Step 1 Supplier CSV'
+                  : 'Generate PLU Profit CSV'
             }
           />
         ) : (
@@ -216,6 +247,11 @@ function App() {
             {isInvoiceMode ? (
               <ProcessingResults 
                 results={results}
+                onDownload={handleDownload}
+              />
+            ) : isPluMode ? (
+              <PluProfitResults
+                result={pluProfitResult}
                 onDownload={handleDownload}
               />
             ) : (
@@ -257,7 +293,11 @@ function App() {
               className="reset-button"
               onClick={handleReset}
             >
-              {isInvoiceMode ? 'Process More Files' : 'Start New Two-Step Run'}
+              {isInvoiceMode
+                ? 'Process More Files'
+                : isSupplierMode
+                  ? 'Start New Two-Step Run'
+                  : 'Extract Another PLU CSV'}
             </button>
           </>
         )}
